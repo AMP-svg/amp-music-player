@@ -1,0 +1,1132 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Music Player Editor</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #101010;
+  color: white;
+  font-family: Arial, sans-serif;
+  padding: 15px;
+}
+
+h2 {
+  text-align: center;
+  margin: 12px 0 20px;
+}
+
+.editor {
+  max-width: 600px;
+  margin: auto;
+  background: #202020;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+label {
+  display: block;
+  margin: 15px 0 7px;
+  font-size: 14px;
+  color: #ddd;
+}
+
+input[type="text"],
+input[type="file"],
+select {
+  width: 100%;
+  padding: 12px;
+  border-radius: 9px;
+  border: 1px solid #444;
+  background: #303030;
+  color: white;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: white;
+}
+
+button {
+  border: none;
+  padding: 13px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+button:disabled {
+  opacity: .5;
+}
+
+.preview {
+  width: 100%;
+  margin-top: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #111;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.buttons button {
+  flex: 1;
+}
+
+.play {
+  background: white;
+  color: black;
+}
+
+.reset {
+  background: #444;
+  color: white;
+}
+
+.settings {
+  margin-top: 20px;
+  padding: 13px;
+  border-radius: 12px;
+  background: #292929;
+}
+
+.export {
+  background: #16a34a;
+  color: white;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.download {
+  background: #2563eb;
+  color: white;
+  width: 100%;
+  margin-top: 10px;
+  display: none;
+}
+
+.status {
+  text-align: center;
+  color: #bbb;
+  font-size: 13px;
+  margin-top: 12px;
+  line-height: 1.6;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🎵 MUSIC PLAYER EDITOR</h2>
+
+<div class="editor">
+
+  <div class="preview">
+    <canvas id="canvas" width="1080" height="1920"></canvas>
+  </div>
+
+  <div class="buttons">
+    <button class="play" onclick="togglePlay()">
+      ▶ PLAY / PAUSE
+    </button>
+
+    <button class="reset" onclick="resetMusic()">
+      ↺ RESET
+    </button>
+  </div>
+
+  <div class="settings">
+
+    <h3>⚙️ EDIT TEMPLATE</h3>
+
+    <label>Upload Cover Musik</label>
+    <input type="file" id="coverInput" accept="image/*">
+
+    <label>Upload Background</label>
+    <input type="file" id="bgInput" accept="image/*">
+
+    <label>Upload Lagu</label>
+    <input type="file" id="audioInput" accept="audio/*">
+
+    <label>Judul Lagu</label>
+    <input type="text" id="titleInput"
+    value="DJ KESAYANGANNYA AKU">
+
+    <label>Nama Artis</label>
+    <input type="text" id="artistInput"
+    value="Oky Fvnky">
+
+    <label>Tulisan di Bawah Logo</label>
+    <input type="text" id="footerInput"
+    value="iPhone">
+
+    <label>Ikon Bawah</label>
+    <select id="footerIcon">
+      <option value="◉">AirPlay</option>
+      <option value="♫">Musik</option>
+      <option value="●">Lingkaran</option>
+      <option value="none">Tanpa Ikon</option>
+    </select>
+
+    <label>Blur Background</label>
+    <input type="range" id="blurInput"
+    min="0" max="30" value="12">
+
+    <label>Resolusi Video</label>
+    <select id="resolution">
+      <option value="1080">1080p Full HD</option>
+      <option value="720">720p HD</option>
+    </select>
+
+    <label>FPS Video</label>
+    <select id="fps">
+      <option value="60">60 FPS</option>
+      <option value="30">30 FPS</option>
+    </select>
+
+    <label>Format Video</label>
+    <select id="format">
+      <option value="mp4">MP4 (Jika didukung)</option>
+      <option value="webm">WebM</option>
+    </select>
+
+  </div>
+
+  <button class="export" id="exportBtn"
+  onclick="exportVideo()">
+    ⬇ EXPORT VIDEO
+  </button>
+
+  <button class="download" id="downloadBtn"
+  onclick="downloadVideo()">
+    DOWNLOAD VIDEO
+  </button>
+
+  <div class="status" id="status">
+    Siap digunakan. Silakan edit template.
+  </div>
+
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+
+// ===================================
+// DASAR
+// ===================================
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const audio = document.getElementById("audio");
+
+const W = 1080;
+const H = 1920;
+
+let cover = new Image();
+let background = new Image();
+
+let coverReady = false;
+let bgReady = false;
+
+let audioContext = null;
+let audioSource = null;
+let audioDestination = null;
+
+let recorder = null;
+let recordedChunks = [];
+let finalVideo = null;
+
+let isPlaying = false;
+let isExporting = false;
+
+let exportCanvas = null;
+let exportStream = null;
+let exportAnimation = null;
+
+
+// ===================================
+// GAMBAR
+// ===================================
+
+function roundedRect(x,y,w,h,r,color) {
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(x,y,w,h,r);
+  ctx.fill();
+
+}
+
+
+function fitText(text,maxWidth) {
+
+  let result = String(text || "");
+
+  while (
+    ctx.measureText(result).width > maxWidth &&
+    result.length > 1
+  ) {
+    result = result.slice(0,-1);
+  }
+
+  if (result !== String(text || "")) {
+    result += "...";
+  }
+
+  return result;
+
+}
+
+
+function drawImageCover(img,x,y,w,h) {
+
+  const ratio = Math.max(
+    w/img.width,
+    h/img.height
+  );
+
+  const sw = w/ratio;
+  const sh = h/ratio;
+
+  const sx = (img.width-sw)/2;
+  const sy = (img.height-sh)/2;
+
+  ctx.drawImage(
+    img,
+    sx,sy,sw,sh,
+    x,y,w,h
+  );
+
+}
+
+
+function formatTime(seconds) {
+
+  if (!isFinite(seconds)) return "0:00";
+
+  const min = Math.floor(seconds/60);
+  const sec = Math.floor(seconds%60);
+
+  return min + ":" + (sec<10?"0":"") + sec;
+
+}
+
+
+// ===================================
+// RENDER TEMPLATE
+// ===================================
+
+function draw() {
+
+  ctx.clearRect(0,0,W,H);
+
+  // BACKGROUND
+
+  const bg = bgReady ? background : cover;
+
+  if (bg && bg.complete && bg.naturalWidth) {
+
+    ctx.save();
+
+    ctx.filter =
+      "blur(" +
+      document.getElementById("blurInput").value +
+      "px)";
+
+    ctx.drawImage(bg,-45,-45,W+90,H+90);
+
+    ctx.restore();
+
+  } else {
+
+    const gradient =
+      ctx.createLinearGradient(0,0,W,H);
+
+    gradient.addColorStop(0,"#55554e");
+    gradient.addColorStop(.5,"#242424");
+    gradient.addColorStop(1,"#77705b");
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0,0,W,H);
+
+  }
+
+  // DARK OVERLAY
+
+  ctx.fillStyle = "rgba(0,0,0,0.48)";
+  ctx.fillRect(0,0,W,H);
+
+
+  // GLASS CARD
+
+  roundedRect(
+    120,300,840,1320,90,
+    "rgba(20,20,20,0.66)"
+  );
+
+
+  // COVER
+
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.roundRect(170,350,740,740,45);
+  ctx.clip();
+
+  if (coverReady) {
+
+    drawImageCover(cover,170,350,740,740);
+
+  } else {
+
+    const g = ctx.createLinearGradient(
+      170,350,910,1090
+    );
+
+    g.addColorStop(0,"#777");
+    g.addColorStop(1,"#222");
+
+    ctx.fillStyle = g;
+    ctx.fillRect(170,350,740,740);
+
+    ctx.fillStyle = "white";
+    ctx.font = "bold 55px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("YOUR COVER",540,735);
+
+  }
+
+  ctx.restore();
+
+
+  // TITLE
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 34px Arial";
+
+  const title =
+    document.getElementById("titleInput").value;
+
+  ctx.fillText(
+    fitText(title,700),
+    170,1180
+  );
+
+
+  // ARTIST
+
+  ctx.fillStyle = "#bcbcbc";
+  ctx.font = "30px Arial";
+
+  const artist =
+    document.getElementById("artistInput").value;
+
+  ctx.fillText(
+    fitText(artist,700),
+    170,1225
+  );
+
+
+  // EQUALIZER
+
+  ctx.fillStyle = "#cccccc";
+
+  for(let i=0;i<6;i++) {
+
+    const height = 25 + Math.random()*35;
+
+    ctx.fillRect(
+      860+i*10,
+      1160-height/2,
+      5,
+      height
+    );
+
+  }
+
+
+  // PROGRESS BAR
+
+  const duration = audio.duration || 0;
+  const current = audio.currentTime || 0;
+
+  const progress =
+    duration ? current/duration : 0;
+
+  roundedRect(
+    170,1300,740,17,10,
+    "rgba(255,255,255,0.25)"
+  );
+
+  roundedRect(
+    170,1300,740*progress,17,10,
+    "#ffffff"
+  );
+
+
+  // TIME
+
+  ctx.font = "26px Arial";
+  ctx.fillStyle = "#bbbbbb";
+
+  ctx.textAlign = "left";
+
+  ctx.fillText(
+    formatTime(current),
+    170,1360
+  );
+
+  ctx.textAlign = "right";
+
+  ctx.fillText(
+    "-" + formatTime(Math.max(0,duration-current)),
+    910,1360
+  );
+
+
+  // PLAYER BUTTONS
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+
+  ctx.font = "65px Arial";
+  ctx.fillText("☆",250,1490);
+
+  ctx.font = "bold 85px Arial";
+  ctx.fillText("◀◀",400,1490);
+
+  ctx.font = "100px Arial";
+  ctx.fillText(
+    isPlaying ? "Ⅱ" : "▶",
+    540,1495
+  );
+
+  ctx.font = "bold 85px Arial";
+  ctx.fillText("▶▶",680,1490);
+
+
+  // VOLUME
+
+  roundedRect(
+    240,1575,600,14,10,
+    "rgba(255,255,255,0.25)"
+  );
+
+  roundedRect(
+    240,1575,420,14,10,
+    "#dddddd"
+  );
+
+  ctx.font = "38px Arial";
+  ctx.fillStyle = "#cccccc";
+
+  ctx.textAlign = "left";
+  ctx.fillText("◀",180,1605);
+
+  ctx.textAlign = "right";
+  ctx.fillText("◖",900,1605);
+
+
+  // FOOTER
+
+  roundedRect(
+    410,1690,260,85,50,
+    "rgba(210,210,210,0.17)"
+  );
+
+  const icon =
+    document.getElementById("footerIcon").value;
+
+  const footer =
+    document.getElementById("footerInput").value;
+
+  const footerText =
+    (icon === "none" ? "" : icon+"  ") + footer;
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "white";
+  ctx.font = "bold 32px Arial";
+
+  ctx.fillText(
+    fitText(footerText,230),
+    540,1745
+  );
+
+
+  // BOTTOM DETAIL
+
+  roundedRect(
+    410,1835,260,7,5,
+    "rgba(255,255,255,0.3)"
+  );
+
+}
+
+
+// ===================================
+// COVER UPLOAD
+// ===================================
+
+document.getElementById("coverInput")
+.addEventListener("change",function(e) {
+
+  const file = e.target.files[0];
+
+  if(!file) return;
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = function() {
+
+    cover = img;
+    coverReady = true;
+
+    URL.revokeObjectURL(url);
+
+  };
+
+  img.src = url;
+
+});
+
+
+// ===================================
+// BACKGROUND UPLOAD
+// ===================================
+
+document.getElementById("bgInput")
+.addEventListener("change",function(e) {
+
+  const file = e.target.files[0];
+
+  if(!file) return;
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = function() {
+
+    background = img;
+    bgReady = true;
+
+    URL.revokeObjectURL(url);
+
+  };
+
+  img.src = url;
+
+});
+
+
+// ===================================
+// AUDIO UPLOAD
+// ===================================
+
+document.getElementById("audioInput")
+.addEventListener("change",function(e) {
+
+  const file = e.target.files[0];
+
+  if(!file) return;
+
+  audio.pause();
+
+  audio.src = URL.createObjectURL(file);
+  audio.load();
+
+  isPlaying = false;
+
+  document.getElementById("status").textContent =
+    "Lagu berhasil dimuat.";
+
+});
+
+
+// ===================================
+// LIVE EDIT
+// ===================================
+
+[
+  "titleInput",
+  "artistInput",
+  "footerInput",
+  "footerIcon",
+  "blurInput"
+].forEach(id => {
+
+  document.getElementById(id)
+  .addEventListener("input",draw);
+
+});
+
+
+// ===================================
+// AUDIO SYSTEM
+// ===================================
+
+async function setupAudio() {
+
+  if(!audioContext) {
+
+    const AudioContextClass =
+      window.AudioContext ||
+      window.webkitAudioContext;
+
+    if(!AudioContextClass) {
+      throw new Error("Audio tidak didukung.");
+    }
+
+    audioContext = new AudioContextClass();
+
+    audioSource =
+      audioContext.createMediaElementSource(audio);
+
+    audioDestination =
+      audioContext.createMediaStreamDestination();
+
+    audioSource.connect(audioContext.destination);
+
+    audioSource.connect(audioDestination);
+
+  }
+
+  if(audioContext.state === "suspended") {
+    await audioContext.resume();
+  }
+
+}
+
+
+async function togglePlay() {
+
+  if(!audio.src) {
+    alert("Upload lagu terlebih dahulu!");
+    return;
+  }
+
+  if(isExporting) return;
+
+  if(isPlaying) {
+
+    audio.pause();
+    isPlaying = false;
+
+  } else {
+
+    try {
+
+      await setupAudio();
+
+      await audio.play();
+
+      isPlaying = true;
+
+    } catch(error) {
+
+      alert("Gagal memutar audio: "+error.message);
+
+    }
+
+  }
+
+}
+
+
+function resetMusic() {
+
+  if(isExporting) return;
+
+  audio.pause();
+  audio.currentTime = 0;
+
+  isPlaying = false;
+
+}
+
+
+audio.addEventListener("play",() => {
+  isPlaying = true;
+});
+
+audio.addEventListener("pause",() => {
+  isPlaying = false;
+});
+
+audio.addEventListener("ended",() => {
+
+  isPlaying = false;
+
+  if(
+    isExporting &&
+    recorder &&
+    recorder.state === "recording"
+  ) {
+    recorder.stop();
+  }
+
+});
+
+
+// ===================================
+// EXPORT VIDEO
+// ===================================
+
+async function exportVideo() {
+
+  if(!audio.src) {
+    alert("Upload lagu terlebih dahulu!");
+    return;
+  }
+
+  if(!window.MediaRecorder ||
+     !HTMLCanvasElement.prototype.captureStream) {
+
+    alert("Browser belum mendukung export video.");
+    return;
+
+  }
+
+  if(isExporting) return;
+
+  const btn =
+    document.getElementById("exportBtn");
+
+  const status =
+    document.getElementById("status");
+
+  const downloadBtn =
+    document.getElementById("downloadBtn");
+
+  try {
+
+    await setupAudio();
+
+    const selectedResolution =
+      document.getElementById("resolution").value;
+
+    const fps = Number(
+      document.getElementById("fps").value
+    );
+
+    const width =
+      selectedResolution === "720" ? 720 : 1080;
+
+    const height =
+      selectedResolution === "720" ? 1280 : 1920;
+
+
+    // SIAPKAN CANVAS EXPORT
+
+    exportCanvas = document.createElement("canvas");
+
+    exportCanvas.width = width;
+    exportCanvas.height = height;
+
+    const exportCtx = exportCanvas.getContext("2d");
+
+
+    // STREAM VIDEO
+
+    exportStream = exportCanvas.captureStream(fps);
+
+
+    // AUDIO TRACK
+
+    const audioTrack =
+      audioDestination.stream.getAudioTracks()[0];
+
+    if(!audioTrack) {
+      throw new Error("Audio track tidak tersedia.");
+    }
+
+    const combinedStream = new MediaStream([
+
+      ...exportStream.getVideoTracks(),
+
+      audioTrack
+
+    ]);
+
+
+    // PILIH FORMAT
+
+    const wanted =
+      document.getElementById("format").value;
+
+    const mp4Types = [
+
+      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+      "video/mp4"
+
+    ];
+
+    const webmTypes = [
+
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm"
+
+    ];
+
+    const candidates =
+      wanted === "mp4"
+      ? [...mp4Types,...webmTypes]
+      : webmTypes;
+
+    let mimeType = "";
+
+    for(const type of candidates) {
+
+      if(MediaRecorder.isTypeSupported(type)) {
+
+        mimeType = type;
+        break;
+
+      }
+
+    }
+
+    if(!mimeType) {
+      throw new Error("Format video tidak didukung.");
+    }
+
+    const actualFormat =
+      mimeType.includes("mp4") ? "mp4" : "webm";
+
+
+    // SIAPKAN RECORDER
+
+    recordedChunks = [];
+    finalVideo = null;
+
+    recorder = new MediaRecorder(combinedStream,{
+
+      mimeType: mimeType,
+
+      videoBitsPerSecond: 12000000,
+
+      audioBitsPerSecond: 192000
+
+    });
+
+
+    recorder.ondataavailable = function(event) {
+
+      if(event.data && event.data.size > 0) {
+        recordedChunks.push(event.data);
+      }
+
+    };
+
+
+    // EXPORT SELESAI
+
+    recorder.onstop = function() {
+
+      if(exportAnimation) {
+        cancelAnimationFrame(exportAnimation);
+        exportAnimation = null;
+      }
+
+      finalVideo = new Blob(recordedChunks,{
+
+        type: mimeType
+
+      });
+
+      isExporting = false;
+      isPlaying = false;
+
+      if(exportStream) {
+
+        exportStream.getTracks().forEach(track => {
+          track.stop();
+        });
+
+      }
+
+      btn.disabled = false;
+      btn.textContent = "⬇ EXPORT VIDEO";
+
+      downloadBtn.style.display = "block";
+
+      status.textContent =
+        "Video selesai! " +
+        width+"x"+height+
+        " | Target "+fps+" FPS"+
+        " | "+actualFormat.toUpperCase();
+
+      if(wanted === "mp4" && actualFormat !== "mp4") {
+
+        status.textContent +=
+          " (Browser menggunakan WebM sebagai pengganti MP4)";
+
+      }
+
+      draw();
+
+    };
+
+
+    // RESET AUDIO
+
+    audio.pause();
+    audio.currentTime = 0;
+
+    isExporting = true;
+
+    btn.disabled = true;
+    btn.textContent = "SEDANG MEREKAM...";
+
+    downloadBtn.style.display = "none";
+
+    // MULAI RECORDING
+
+    recorder.start(1000);
+
+
+    // ANIMASI CANVAS EXPORT
+
+    function renderExport() {
+
+      exportCtx.clearRect(0,0,width,height);
+
+      exportCtx.drawImage(
+        canvas,
+        0,0,width,height
+      );
+
+      if(isExporting) {
+
+        exportAnimation =
+          requestAnimationFrame(renderExport);
+
+      }
+
+    }
+
+    renderExport();
+
+
+    // MULAI LAGU
+
+    await audio.play();
+
+    isPlaying = true;
+
+    status.textContent =
+      "Sedang membuat video. Jangan tutup halaman.";
+
+  } catch(error) {
+
+    isExporting = false;
+
+    btn.disabled = false;
+    btn.textContent = "⬇ EXPORT VIDEO";
+
+    if(recorder && recorder.state === "recording") {
+      recorder.stop();
+    }
+
+    if(exportAnimation) {
+      cancelAnimationFrame(exportAnimation);
+      exportAnimation = null;
+    }
+
+    if(exportStream) {
+      exportStream.getTracks().forEach(t => t.stop());
+    }
+
+    alert("Export gagal: "+error.message);
+
+  }
+
+}
+
+
+// ===================================
+// DOWNLOAD VIDEO
+// ===================================
+
+function downloadVideo() {
+
+  if(!finalVideo) {
+
+    alert("Video belum selesai dibuat.");
+
+    return;
+
+  }
+
+  const url = URL.createObjectURL(finalVideo);
+
+  const extension =
+    finalVideo.type.includes("mp4")
+    ? "mp4"
+    : "webm";
+
+  const link = document.createElement("a");
+
+  link.href = url;
+
+  link.download =
+    "Music_Template."+extension;
+
+  document.body.appendChild(link);
+
+  link.click();
+
+  link.remove();
+
+  setTimeout(() => {
+
+    URL.revokeObjectURL(url);
+
+  },60000);
+
+}
+
+
+// ===================================
+// JALANKAN TEMPLATE
+// ===================================
+
+function animationLoop() {
+
+  draw();
+
+  requestAnimationFrame(animationLoop);
+
+}
+
+animationLoop();
+
+</script>
+
+</body>
+</html>
+AM
